@@ -32,10 +32,6 @@ type (
 
 	ProviderOauthConfFrontend struct {
 		Provider    string
-		ClientId    string
-		AuthURL     string
-		RedirectUri string
 		IconSVG     string
-		Scopes      []string
 	}
 )

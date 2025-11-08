@@ -73,11 +73,7 @@ func NewApp(ctx context.Context, config config, dbConn *pgxpool.Pool) (*App, err
 		providerOauthConfFrontend = append(providerOauthConfFrontend,
 			authinterface.ProviderOauthConfFrontend{
 				Provider:    key,
-				ClientId:    value.Oauth2Config.ClientID,
-				RedirectUri: value.Oauth2Config.RedirectURL,
-				AuthURL:     value.Oauth2Config.Endpoint.AuthURL,
 				IconSVG:     value.IconSVG,
-				Scopes:      value.Oauth2Config.Scopes,
 			},
 		)
 	}

@@ -24,7 +24,17 @@ type stateData struct {
 var (
 	stateStore   = map[string]stateData{}
 	stateStoreMu sync.Mutex
+	// internal session stores (opaque tokens) for unified auth
+	internalByAccess  = map[string]sessionData{}
+	internalByRefresh = map[string]string{} // refresh -> access
+	internalMu        sync.Mutex
 )
+
+type sessionData struct {
+	User          map[string]interface{}
+	AccessExpiry  time.Time
+	RefreshExpiry time.Time
+}
 
 func main() {
 	port := os.Getenv("PORT")
@@ -35,6 +45,7 @@ func main() {
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/callback", callbackHandler)
 	http.HandleFunc("/exchange", exchangeHandler)
+	http.HandleFunc("/auth/refresh", refreshHandler)
 	http.HandleFunc("/userinfo", userInfoHandler)
 
 	log.Printf("TestServer starting on :%s", port)
@@ -165,9 +176,30 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// forward token response as-is
+	// parse provider token response
+	var provResp map[string]interface{}
+	_ = json.Unmarshal(body, &provResp)
+
+	// get provider access token
+	providerAccess, _ := provResp["access_token"].(string)
+	// fetch user info from provider if available
+	var user map[string]interface{}
+	if providerAccess != "" {
+		user = fetchYandexUser(providerAccess)
+	}
+
+	// create internal opaque tokens
+	access, refresh, expiresIn := createInternalTokens(user)
+
+	out := map[string]interface{}{
+		"internal_access_token":  access,
+		"internal_refresh_token": refresh,
+		"expires_in":             expiresIn,
+		"provider_response":      provResp,
+		"user":                   user,
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(body)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // exchangeHandler allows mobile clients to POST { code, code_verifier, redirect_uri? }
@@ -181,6 +213,7 @@ func exchangeHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Code         string `json:"code"`
 		CodeVerifier string `json:"code_verifier"`
+		State        string `json:"state"`
 		RedirectURI  string `json:"redirect_uri"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -214,6 +247,15 @@ func exchangeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.CodeVerifier != "" {
 		form.Set("code_verifier", req.CodeVerifier)
+	} else if req.State != "" {
+		// if client didn't provide verifier, try server-side stored verifier by state
+		stateStoreMu.Lock()
+		if d, ok := stateStore[req.State]; ok {
+			form.Set("code_verifier", d.CodeVerifier)
+			// consume one-time verifier
+			delete(stateStore, req.State)
+		}
+		stateStoreMu.Unlock()
 	}
 
 	req2, err := http.NewRequest("POST", tokenEndpoint, strings.NewReader(form.Encode()))
@@ -237,9 +279,27 @@ func exchangeHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write(body)
 		return
 	}
+	// parse provider token response
+	var provResp map[string]interface{}
+	_ = json.Unmarshal(body, &provResp)
 
+	providerAccess, _ := provResp["access_token"].(string)
+	var user map[string]interface{}
+	if providerAccess != "" {
+		user = fetchYandexUser(providerAccess)
+	}
+
+	access, refresh, expiresIn := createInternalTokens(user)
+
+	out := map[string]interface{}{
+		"internal_access_token":  access,
+		"internal_refresh_token": refresh,
+		"expires_in":             expiresIn,
+		"provider_response":      provResp,
+		"user":                   user,
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(body)
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 func userInfoHandler(w http.ResponseWriter, r *http.Request) {
@@ -282,6 +342,100 @@ func userInfoHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(body)
+}
+
+// fetchYandexUser retrieves user info from Yandex using the provider access token.
+func fetchYandexUser(providerAccess string) map[string]interface{} {
+	infoURL := "https://login.yandex.ru/info?format=json"
+	req, _ := http.NewRequest("GET", infoURL, nil)
+	req.Header.Set("Authorization", "OAuth "+providerAccess)
+	client := http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return nil
+	}
+	var user map[string]interface{}
+	_ = json.NewDecoder(resp.Body).Decode(&user)
+	return user
+}
+
+// createInternalTokens creates opaque internal access and refresh tokens and stores session.
+func createInternalTokens(user map[string]interface{}) (access string, refresh string, expiresIn int) {
+	access = randomURLSafe(32)
+	refresh = randomURLSafe(64)
+	expires := 15 * time.Minute
+	expiry := time.Now().Add(expires)
+	refreshExpiry := time.Now().Add(30 * 24 * time.Hour)
+
+	internalMu.Lock()
+	internalByAccess[access] = sessionData{
+		User:          user,
+		AccessExpiry:  expiry,
+		RefreshExpiry: refreshExpiry,
+	}
+	internalByRefresh[refresh] = access
+	internalMu.Unlock()
+	return access, refresh, int(expires.Seconds())
+}
+
+// refreshHandler rotates access token using a refresh token.
+func refreshHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid json: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.RefreshToken == "" {
+		http.Error(w, "refresh_token required", http.StatusBadRequest)
+		return
+	}
+
+	internalMu.Lock()
+	access, ok := internalByRefresh[req.RefreshToken]
+	if !ok {
+		internalMu.Unlock()
+		http.Error(w, "invalid refresh token", http.StatusUnauthorized)
+		return
+	}
+	sess, ok2 := internalByAccess[access]
+	if !ok2 {
+		// inconsistent state
+		delete(internalByRefresh, req.RefreshToken)
+		internalMu.Unlock()
+		http.Error(w, "invalid session", http.StatusUnauthorized)
+		return
+	}
+	// rotate access token
+	newAccess := randomURLSafe(32)
+	newExpiry := time.Now().Add(15 * time.Minute)
+	internalByAccess[newAccess] = sessionData{
+		User:          sess.User,
+		AccessExpiry:  newExpiry,
+		RefreshExpiry: sess.RefreshExpiry,
+	}
+	// update refresh -> access mapping
+	internalByRefresh[req.RefreshToken] = newAccess
+	// remove old access entry
+	delete(internalByAccess, access)
+	internalMu.Unlock()
+
+	out := map[string]interface{}{
+		"internal_access_token":  newAccess,
+		"internal_refresh_token": req.RefreshToken,
+		"expires_in":             int(15 * time.Minute / time.Second),
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // helpers
