@@ -2,9 +2,10 @@ package tokenservice
 
 import (
 	"fmt"
-	"github.com/golang-jwt/jwt"
-	"github.com/inzarubin80/Warden/internal/model"
 	"time"
+
+	"github.com/golang-jwt/jwt"
+	"github.com/inzarubin80/Server/internal/model"
 )
 
 type (

@@ -2,38 +2,12 @@ package service
 
 import (
 	"context"
-	authinterface "github.com/inzarubin80/Warden/internal/app/authinterface"
-	"github.com/inzarubin80/Warden/internal/model"
+
+	authinterface "github.com/inzarubin80/Server/internal/app/authinterface"
+	"github.com/inzarubin80/Server/internal/model"
 )
 
 type (
-	TASK_MESSAGE struct {
-		Action string
-		Task   *model.Task
-		TaskID model.TaskID
-	}
-
-	VOTE_STATE_CHANGE_MESSAGE struct {
-		Action string
-		State  *model.VoteControlState
-	}
-
-	USER_ESTIMATE_MESSAGE struct {
-		Action       string
-		VotingResult *model.VotingResult
-	}
-
-	ADD_POKER_USER_MESSAGE struct {
-		Action string
-		Users  []*model.User
-	}
-
-	COMMENT_MESSAGE struct {
-		Action    string
-		Comment   *model.Comment
-		CommentID model.CommentID
-	}
-
 	PokerService struct {
 		repository          Repository
 		hub                 Hub
@@ -44,7 +18,6 @@ type (
 
 	Repository interface {
 
-	
 		//User
 		GetUserAuthProvidersByProviderUid(ctx context.Context, ProviderUid string, Provider string) (*model.UserAuthProviders, error)
 		AddUserAuthProviders(ctx context.Context, userProfileFromProvide *model.UserProfileFromProvider, userID model.UserID) (*model.UserAuthProviders, error)
@@ -55,7 +28,6 @@ type (
 		SetUserName(ctx context.Context, userID model.UserID, name string) error
 		GetUser(ctx context.Context, userID model.UserID) (*model.User, error)
 		SetUserSettings(ctx context.Context, userID model.UserID, userSettings *model.UserSettings) error
-
 	}
 
 	TokenService interface {

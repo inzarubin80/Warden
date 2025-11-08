@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	authinterface "github.com/inzarubin80/Warden/internal/app/authinterface"
-	providerUserData "github.com/inzarubin80/Warden/internal/app/clients/provider_user_data"
-	appHttp "github.com/inzarubin80/Warden/internal/app/http"
-	middleware "github.com/inzarubin80/Warden/internal/app/http/middleware"
-	ws "github.com/inzarubin80/Warden/internal/app/ws"
-	service "github.com/inzarubin80/Warden/internal/service"
+	authinterface "github.com/inzarubin80/Server/internal/app/authinterface"
+	providerUserData "github.com/inzarubin80/Server/internal/app/clients/provider_user_data"
+	appHttp "github.com/inzarubin80/Server/internal/app/http"
+	middleware "github.com/inzarubin80/Server/internal/app/http/middleware"
+	ws "github.com/inzarubin80/Server/internal/app/ws"
+	service "github.com/inzarubin80/Server/internal/service"
 
 	"github.com/gorilla/sessions"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -76,7 +76,8 @@ func NewApp(ctx context.Context, config config, dbConn *pgxpool.Pool) (*App, err
 				ClientId:    value.Oauth2Config.ClientID,
 				RedirectUri: value.Oauth2Config.RedirectURL,
 				AuthURL:     value.Oauth2Config.Endpoint.AuthURL,
-				ImageBase64: value.ImageBase64,
+				IconSVG:     value.IconSVG,
+				Scopes:      value.Oauth2Config.Scopes,
 			},
 		)
 	}
@@ -88,8 +89,6 @@ func NewApp(ctx context.Context, config config, dbConn *pgxpool.Pool) (*App, err
 	corsMiddleware := cors.New(cors.Options{
 		// Явно разрешаем оба домена (без точки в начале)
 		AllowedOrigins: []string{
-			"https://poker-planning.ru",
-			"https://api.poker-planning.ru",
 			"http://localhost:3000",
 		},
 		// Добавляем все необходимые методы

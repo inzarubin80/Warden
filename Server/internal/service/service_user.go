@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/inzarubin80/Warden/internal/model"
+	"github.com/inzarubin80/Server/internal/model"
 )
 
 func (s *PokerService) SetUserName(ctx context.Context, userID model.UserID, name string) error {

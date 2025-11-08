@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/inzarubin80/Warden/internal/model"
-	sqlc_repository "github.com/inzarubin80/Warden/internal/repository_sqlc"
+	"github.com/inzarubin80/Server/internal/model"
+	sqlc_repository "github.com/inzarubin80/Server/internal/repository_sqlc"
 )
 
 func (r *Repository) CreateUser(ctx context.Context, userData *model.UserProfileFromProvider) (*model.User, error) {

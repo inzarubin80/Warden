@@ -1,8 +1,9 @@
 package http
 
 import (
-	"github.com/inzarubin80/Warden/internal/app/uhttp"
 	"net/http"
+
+	"github.com/inzarubin80/Server/internal/app/uhttp"
 )
 
 type (

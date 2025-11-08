@@ -3,8 +3,8 @@ package provideruserdata
 import (
 	"context"
 	"encoding/json"
-	"github.com/inzarubin80/Warden/internal/model"
-
+	"fmt"
+	"github.com/inzarubin80/Server/internal/model"
 	"golang.org/x/oauth2"
 )
 
@@ -41,6 +41,20 @@ func (p *ProviderUserData) GetUserData(ctx context.Context, authorizationCode st
 		return nil, err
 	}
 
+	// Используем разные обработчики для разных провайдеров
+	switch p.provider {
+	case "yandex":
+		return p.parseYandexProfile(profile)
+	case "google":
+		return p.parseGoogleProfile(profile)
+	case "github":
+		return p.parseGitHubProfile(profile)
+	default:
+		return p.parseDefaultProfile(profile)
+	}
+}
+
+func (p *ProviderUserData) parseYandexProfile(profile map[string]interface{}) (*model.UserProfileFromProvider, error) {
 	displayName, _ := profile["real_name"].(string)
 	providerID, _ := profile["id"].(string)
 	defaultEmail, _ := profile["default_email"].(string)
@@ -52,6 +66,81 @@ func (p *ProviderUserData) GetUserData(ctx context.Context, authorizationCode st
 		ProviderID:   providerID,
 		ProviderName: p.provider,
 		Email:        defaultEmail,
+		FirstName:    firstName,
+		LastName:     lastName,
+	}
+
+	return userData, nil
+}
+
+func (p *ProviderUserData) parseGoogleProfile(profile map[string]interface{}) (*model.UserProfileFromProvider, error) {
+	// Google API возвращает данные в другом формате
+	displayName, _ := profile["name"].(string)
+	providerID, _ := profile["id"].(string)
+	email, _ := profile["email"].(string)
+	firstName, _ := profile["given_name"].(string)
+	lastName, _ := profile["family_name"].(string)
+
+	// Если displayName пустой, используем комбинацию имени и фамилии
+	if displayName == "" {
+		if firstName != "" && lastName != "" {
+			displayName = fmt.Sprintf("%s %s", firstName, lastName)
+		} else if firstName != "" {
+			displayName = firstName
+		} else if lastName != "" {
+			displayName = lastName
+		}
+	}
+
+	userData := &model.UserProfileFromProvider{
+		Name:         displayName,
+		ProviderID:   providerID,
+		ProviderName: p.provider,
+		Email:        email,
+		FirstName:    firstName,
+		LastName:     lastName,
+	}
+
+	return userData, nil
+}
+
+func (p *ProviderUserData) parseGitHubProfile(profile map[string]interface{}) (*model.UserProfileFromProvider, error) {
+	// GitHub API возвращает данные в своем формате
+	displayName, _ := profile["name"].(string)
+	providerID, _ := profile["id"].(float64) // GitHub возвращает ID как число
+	email, _ := profile["email"].(string)
+	login, _ := profile["login"].(string)
+
+	// Если displayName пустой, используем login
+	if displayName == "" {
+		displayName = login
+	}
+
+	userData := &model.UserProfileFromProvider{
+		Name:         displayName,
+		ProviderID:   fmt.Sprintf("%.0f", providerID), // Конвертируем в строку
+		ProviderName: p.provider,
+		Email:        email,
+		FirstName:    displayName, // GitHub не предоставляет отдельно имя и фамилию
+		LastName:     "",
+	}
+
+	return userData, nil
+}
+
+func (p *ProviderUserData) parseDefaultProfile(profile map[string]interface{}) (*model.UserProfileFromProvider, error) {
+	// Универсальный обработчик для неизвестных провайдеров
+	displayName, _ := profile["name"].(string)
+	providerID, _ := profile["id"].(string)
+	email, _ := profile["email"].(string)
+	firstName, _ := profile["first_name"].(string)
+	lastName, _ := profile["last_name"].(string)
+
+	userData := &model.UserProfileFromProvider{
+		Name:         displayName,
+		ProviderID:   providerID,
+		ProviderName: p.provider,
+		Email:        email,
 		FirstName:    firstName,
 		LastName:     lastName,
 	}

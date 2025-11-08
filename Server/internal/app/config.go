@@ -1,14 +1,12 @@
 package app
 
 import (
-	"encoding/base64"
 	"fmt"
 	"os"
-
-	"github.com/inzarubin80/Warden/internal/app/defenitions"
-
-	authinterface "github.com/inzarubin80/Warden/internal/app/authinterface"
-
+	authinterface "github.com/inzarubin80/Server/internal/app/authinterface"
+	providerUserData "github.com/inzarubin80/Server/internal/app/clients/provider_user_data"
+	"github.com/inzarubin80/Server/internal/app/defenitions"
+	"github.com/inzarubin80/Server/internal/app/icons"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/yandex"
 )
@@ -40,25 +38,52 @@ type (
 )
 
 func NewConfig(opts Options) config {
-
-	imageDataYandexAuth, err := os.ReadFile("images/yandex-auth.png")
-	if err != nil {
-		fmt.Errorf(err.Error())
-	}
-
-	imageBase64 := base64.StdEncoding.EncodeToString(imageDataYandexAuth)
-
 	provaders := make(authinterface.MapProviderOauthConf)
 	provaders["yandex"] = &authinterface.ProviderOauthConf{
 		Oauth2Config: &oauth2.Config{
 			ClientID:     os.Getenv("CLIENT_ID_YANDEX"),
 			ClientSecret: os.Getenv("CLIENT_SECRET_YANDEX"),
-			RedirectURL:  os.Getenv("APP_ROOT") + "/YandexAuthCallback",
-			Scopes:       []string{"login:email", "login:info"},
+			RedirectURL:  os.Getenv("APP_ROOT") + "/auth/callback?provider=yandex",
+			Scopes:       []string{"login:info"},
 			Endpoint:     yandex.Endpoint,
 		},
 		UrlUserData: "https://login.yandex.ru/info?format=json",
-		ImageBase64: imageBase64,
+		IconSVG:     icons.GetProviderIcon("yandex"),
+		DisplayName: "Яндекс",
+		ProviderUserData: providerUserData.NewProviderUserData("https://login.yandex.ru/info?format=json", &oauth2.Config{
+			ClientID:     os.Getenv("CLIENT_ID_YANDEX"),
+			ClientSecret: os.Getenv("CLIENT_SECRET_YANDEX"),
+			RedirectURL:  os.Getenv("APP_ROOT") + "/auth/callback?provider=yandex",
+			Scopes:       []string{"login:info"},
+			Endpoint:     yandex.Endpoint,
+		}, "yandex"),
+	}
+
+	// Добавим Google провайдер для демонстрации
+	provaders["google"] = &authinterface.ProviderOauthConf{
+		Oauth2Config: &oauth2.Config{
+			ClientID:     os.Getenv("CLIENT_ID_GOOGLE"),
+			ClientSecret: os.Getenv("CLIENT_SECRET_GOOGLE"),
+			RedirectURL:  os.Getenv("APP_ROOT") + "/auth/callback?provider=google",
+			Scopes:       []string{"openid", "email", "profile"},
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  "https://accounts.google.com/o/oauth2/auth",
+				TokenURL: "https://oauth2.googleapis.com/token",
+			},
+		},
+		UrlUserData: "https://www.googleapis.com/oauth2/v2/userinfo",
+		IconSVG:     icons.GetProviderIcon("google"),
+		DisplayName: "Google",
+		ProviderUserData: providerUserData.NewProviderUserData("https://www.googleapis.com/oauth2/v2/userinfo", &oauth2.Config{
+			ClientID:     os.Getenv("CLIENT_ID_GOOGLE"),
+			ClientSecret: os.Getenv("CLIENT_SECRET_GOOGLE"),
+			RedirectURL:  os.Getenv("APP_ROOT") + "/auth/callback?provider=google",
+			Scopes:       []string{"openid", "email", "profile"},
+			Endpoint: oauth2.Endpoint{
+				AuthURL:  "https://accounts.google.com/o/oauth2/auth",
+				TokenURL: "https://oauth2.googleapis.com/token",
+			},
+		}, "google"),
 	}
 
 	config := config{
@@ -81,7 +106,7 @@ func NewConfig(opts Options) config {
 
 			getLastSession: fmt.Sprintf("GET	/api/sessions/{%s}/{%s}", defenitions.Page, defenitions.PageSize),
 		},
-
+		
 		sectrets: sectrets{
 			storeSecret:        os.Getenv("STORE_SECRET"),
 			accessTokenSecret:  os.Getenv("ACCESS_TOKEN_SECRET"),

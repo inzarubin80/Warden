@@ -4,7 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/inzarubin80/Warden/internal/model"
+
+	"github.com/inzarubin80/Server/internal/model"
 )
 
 func (s *PokerService) Login(ctx context.Context, providerKey string, authorizationCode string) (*model.AuthData, error) {

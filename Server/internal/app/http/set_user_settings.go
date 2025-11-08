@@ -3,11 +3,12 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"github.com/inzarubin80/Warden/internal/app/defenitions"
-	"github.com/inzarubin80/Warden/internal/app/uhttp"
-	"github.com/inzarubin80/Warden/internal/model"
 	"io"
 	"net/http"
+
+	"github.com/inzarubin80/Server/internal/app/defenitions"
+	"github.com/inzarubin80/Server/internal/app/uhttp"
+	"github.com/inzarubin80/Server/internal/model"
 )
 
 type (

@@ -3,11 +3,12 @@ package middleware
 import (
 	"context"
 	"fmt"
-	"github.com/gorilla/sessions"
-	"github.com/inzarubin80/Warden/internal/app/defenitions"
-	"github.com/inzarubin80/Warden/internal/model"
 	"net/http"
 	"net/url"
+
+	"github.com/gorilla/sessions"
+	"github.com/inzarubin80/Server/internal/app/defenitions"
+	"github.com/inzarubin80/Server/internal/model"
 )
 
 type (

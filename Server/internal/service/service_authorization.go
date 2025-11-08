@@ -2,7 +2,8 @@ package service
 
 import (
 	"context"
-	"github.com/inzarubin80/Warden/internal/model"
+
+	"github.com/inzarubin80/Server/internal/model"
 )
 
 func (s *PokerService) Authorization(ctx context.Context, accessToken string) (*model.Claims, error) {

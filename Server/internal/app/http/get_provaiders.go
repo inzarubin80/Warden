@@ -2,9 +2,10 @@ package http
 
 import (
 	"encoding/json"
-	authinterface "github.com/inzarubin80/Warden/internal/app/authinterface"
-	"github.com/inzarubin80/Warden/internal/app/uhttp"
 	"net/http"
+
+	authinterface "github.com/inzarubin80/Server/internal/app/authinterface"
+	"github.com/inzarubin80/Server/internal/app/uhttp"
 )
 
 type (

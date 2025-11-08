@@ -1,10 +1,11 @@
 package http
 
 import (
-	"github.com/gorilla/sessions"
-	"github.com/inzarubin80/Warden/internal/app/defenitions"
-	"github.com/inzarubin80/Warden/internal/app/uhttp"
 	"net/http"
+
+	"github.com/gorilla/sessions"
+	"github.com/inzarubin80/Server/internal/app/defenitions"
+	"github.com/inzarubin80/Server/internal/app/uhttp"
 )
 
 type (
