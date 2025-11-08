@@ -7,7 +7,6 @@ import (
 	"time"
 
 	authinterface "github.com/inzarubin80/Server/internal/app/authinterface"
-	providerUserData "github.com/inzarubin80/Server/internal/app/clients/provider_user_data"
 	appHttp "github.com/inzarubin80/Server/internal/app/http"
 	middleware "github.com/inzarubin80/Server/internal/app/http/middleware"
 	ws "github.com/inzarubin80/Server/internal/app/ws"
@@ -33,25 +32,24 @@ type (
 	}
 
 	App struct {
-		mux                        mux
-		server                     server
-		pokerService               *service.PokerService
-		config                     config
-		hub                        *ws.Hub
-		oauthConfig                *oauth2.Config
-		store                      *sessions.CookieStore
-		providersOauthConfFrontend []authinterface.ProviderOauthConfFrontend
+		mux           mux
+		server        server
+		pokerService  *service.PokerService
+		config        config
+		hub           *ws.Hub
+		oauthConfig   *oauth2.Config
+		store         *sessions.CookieStore
+		provadersConf authinterface.MapProviderOauthConf
 	}
 )
 
 func (a *App) ListenAndServe() error {
 	go a.hub.Run()
 
-	// Minimal handler set for skeleton: ping, session, providers
 	a.mux.Handle(a.config.path.ping, appHttp.NewPingHandlerHandler(a.config.path.ping))
 	a.mux.Handle(a.config.path.session, appHttp.NewGetSessionHandler(a.store, a.config.path.session))
-	a.mux.Handle(a.config.path.getProviders, appHttp.NewProvadersHandler(a.providersOauthConfFrontend, a.config.path.getProviders))
-
+	a.mux.Handle(a.config.path.getProviders, appHttp.NewProvadersHandler(a.provadersConf, a.config.path.getProviders))
+	a.mux.Handle(a.config.path.login, appHttp.NewLoginHandler(a.provadersConf, a.config.path.login, a.store))	
 	fmt.Println("start server")
 	return a.server.ListenAndServe()
 }
@@ -63,20 +61,6 @@ func NewApp(ctx context.Context, config config, dbConn *pgxpool.Pool) (*App, err
 		hub   = ws.NewHub()
 		store = sessions.NewCookieStore([]byte(config.sectrets.storeSecret))
 	)
-
-	providerOauthConfFrontend := []authinterface.ProviderOauthConfFrontend{}
-	providers := make(authinterface.ProvidersUserData)
-	for key, value := range config.provadersConf {
-
-		providers[key] = providerUserData.NewProviderUserData(value.UrlUserData, value.Oauth2Config, key)
-
-		providerOauthConfFrontend = append(providerOauthConfFrontend,
-			authinterface.ProviderOauthConfFrontend{
-				Provider:    key,
-				IconSVG:     value.IconSVG,
-			},
-		)
-	}
 
 	// Do not instantiate full pokerService in skeleton; leave nil to avoid linking missing implementations.
 	var pokerService *service.PokerService = nil
@@ -104,13 +88,13 @@ func NewApp(ctx context.Context, config config, dbConn *pgxpool.Pool) (*App, err
 	handler := corsMiddleware.Handler(middleware.NewLogMux(mux))
 
 	return &App{
-		mux:                        mux,
-		server:                     &http.Server{Addr: config.addr, Handler: handler, ReadHeaderTimeout: readHeaderTimeoutSeconds * time.Second},
-		pokerService:               pokerService,
-		config:                     config,
-		hub:                        hub,
-		store:                      store,
-		providersOauthConfFrontend: providerOauthConfFrontend,
+		mux:           mux,
+		server:        &http.Server{Addr: config.addr, Handler: handler, ReadHeaderTimeout: readHeaderTimeoutSeconds * time.Second},
+		pokerService:  pokerService,
+		config:        config,
+		hub:           hub,
+		store:         store,
+		provadersConf: config.provadersConf,
 	}, nil
 
 }

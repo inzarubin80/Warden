@@ -10,21 +10,31 @@ import (
 
 type (
 	GetProvadersHandler struct {
-		name                      string
-		providerOauthConfFrontend []authinterface.ProviderOauthConfFrontend
+		name          string
+		provadersConf authinterface.MapProviderOauthConf
 	}
 )
 
-func NewProvadersHandler(providerOauthConfFrontend []authinterface.ProviderOauthConfFrontend, name string) *GetProvadersHandler {
+func NewProvadersHandler(provadersConf authinterface.MapProviderOauthConf, name string) *GetProvadersHandler {
 	return &GetProvadersHandler{
-		name:                      name,
-		providerOauthConfFrontend: providerOauthConfFrontend,
+		name:          name,
+		provadersConf: provadersConf,
 	}
 }
 
 func (h *GetProvadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	jsonContent, err := json.Marshal(h.providerOauthConfFrontend)
+	providerOauthConfFrontend := []authinterface.ProviderOauthConfFrontend{}
+	for key, value := range h.provadersConf {
+		providerOauthConfFrontend = append(providerOauthConfFrontend,
+			authinterface.ProviderOauthConfFrontend{
+				Provider: key,
+				IconSVG:  value.IconSVG,
+			},
+		)
+	}
+
+	jsonContent, err := json.Marshal(providerOauthConfFrontend)
 
 	if err != nil {
 		uhttp.SendErrorResponse(w, http.StatusInternalServerError, err.Error())
@@ -34,5 +44,5 @@ func (h *GetProvadersHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(jsonContent)
-
+	
 }

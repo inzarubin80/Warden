@@ -2,12 +2,12 @@ package http
 
 import (
 	"context"
-	"encoding/json"
+	//"encoding/json"
 	"net/http"
 
 	"github.com/gorilla/sessions"
 	"github.com/inzarubin80/Server/internal/app/defenitions"
-	"github.com/inzarubin80/Server/internal/app/uhttp"
+	//"github.com/inzarubin80/Server/internal/app/uhttp"
 	"github.com/inzarubin80/Server/internal/model"
 )
 
@@ -61,6 +61,7 @@ func (h *RefreshTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	/*
 	responseLoginData := &ResponseLoginData{
 		Token:  authData.AccessToken,
 		UserID: authData.UserID,
@@ -72,5 +73,6 @@ func (h *RefreshTokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	uhttp.SendSuccessfulResponse(w, jsonResponseLoginData)
+	*/
 
 }

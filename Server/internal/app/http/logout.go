@@ -15,7 +15,7 @@ type (
 	}
 )
 
-func NewLogOutHandlerHandler(service serviceLogin, name string, store *sessions.CookieStore) *LogOutHandler {
+func NewLogOutHandlerHandler( name string, store *sessions.CookieStore) *LogOutHandler {
 	return &LogOutHandler{
 		name:  name,
 		store: store,

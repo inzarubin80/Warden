@@ -1,97 +1,98 @@
 package http
 
 import (
-	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
-	"io"
 	"net/http"
-
-	"github.com/inzarubin80/Server/internal/app/defenitions"
-	"github.com/inzarubin80/Server/internal/app/uhttp"
-	"github.com/inzarubin80/Server/internal/model"
+	"sync"
+	"time"
 
 	"github.com/gorilla/sessions"
+	authinterface "github.com/inzarubin80/Server/internal/app/authinterface"
+	"github.com/inzarubin80/Server/internal/app/uhttp"
+	"golang.org/x/oauth2"
 )
 
-type (
-	serviceLogin interface {
-		Login(ctx context.Context, providerKey string, authorizationCode string) (*model.AuthData, error)
-	}
-	LoginHandler struct {
-		name    string
-		service serviceLogin
-		store   *sessions.CookieStore
-	}
+type LoginHandler struct {
+	name              string
+	provadersConf     authinterface.MapProviderOauthConf
+	store             *sessions.CookieStore
+	loginStateStore   map[string]time.Time
+	loginStateStoreMu sync.Mutex
+}
 
-	ResponseLoginData struct {
-		Token  string
-		UserID model.UserID
-	}
-
-	RequestLoginData struct {
-		AuthorizationCode string
-		ProviderKey       string
-	}
-)
-
-func NewLoginHandler(service serviceLogin, name string, store *sessions.CookieStore) *LoginHandler {
+func NewLoginHandler(provadersConf authinterface.MapProviderOauthConf, name string, store *sessions.CookieStore) *LoginHandler {
 	return &LoginHandler{
-		name:    name,
-		service: service,
-		store:   store,
+		name:              name,
+		provadersConf:     provadersConf,
+		store:             store,
+		loginStateStore:   make(map[string]time.Time),
+		loginStateStoreMu: sync.Mutex{},
 	}
 }
 
 func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	ctx := r.Context()
+	var req struct {
+		Provider      string `json:"provider"`
+		CodeChallenge string `json:"code_challenge"`
+	}
 
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		uhttp.SendErrorResponse(w, http.StatusInternalServerError, err.Error())
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		uhttp.SendErrorResponse(w, http.StatusBadRequest, "invalid json")
+		return
+	}
+	if req.Provider == "" {
+		uhttp.SendErrorResponse(w, http.StatusBadRequest, "provider required")
 		return
 	}
 
-	var loginData *RequestLoginData
-	err = json.Unmarshal(body, &loginData)
-	if err != nil {
-		uhttp.SendErrorResponse(w, http.StatusBadRequest, err.Error())
+	cfg, ok := h.provadersConf[req.Provider]
+	if !ok || cfg == nil || cfg.Oauth2Config == nil {
+		uhttp.SendErrorResponse(w, http.StatusBadRequest, "unknown provider")
 		return
 	}
 
-	authData, err := h.service.Login(ctx, loginData.ProviderKey, loginData.AuthorizationCode)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	state := randomURLSafe(24)
+
+	// handle PKCE: prefer client-provided code_challenge; if not and pkce requested, generate verifier
+	var challenge string
+	// require client-provided code_challenge (mobile generates verifier)
+	if req.CodeChallenge == "" {
+		uhttp.SendErrorResponse(w, http.StatusBadRequest, "code_challenge required from client")
 		return
 	}
-	session, _ := h.store.Get(r, defenitions.SessionAuthenticationName)
+	challenge = req.CodeChallenge
 
-	session.Options = &sessions.Options{
-		Path:     "/",
-		MaxAge:   86400 * 7,             // Время жизни сессии (7 дней)
-		HttpOnly: true,                  // Запретить доступ через JavaScript
-		Secure:   true,                  // Требует HTTPS
-		SameSite: http.SameSiteNoneMode, // Разрешить cross-origin
+	// save state server-side (one-time, short TTL) so we can validate it at exchange
+	h.loginStateStoreMu.Lock()
+	h.loginStateStore[state] = time.Now().Add(5 * time.Minute)
+	h.loginStateStoreMu.Unlock()
+
+	localCfg := *cfg.Oauth2Config
+	localCfg.RedirectURL = cfg.Oauth2Config.RedirectURL
+	opts := []oauth2.AuthCodeOption{}
+	if challenge != "" {
+		opts = append(opts, oauth2.SetAuthURLParam("code_challenge", challenge))
+		opts = append(opts, oauth2.SetAuthURLParam("code_challenge_method", "S256"))
 	}
+	authURL := localCfg.AuthCodeURL(state, opts...)
 
-	session.Values[defenitions.Token] = string(authData.RefreshToken)
-	err = session.Save(r, w)
-
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	resp := map[string]string{
+		"auth_url": authURL,
+		"state":    state,
 	}
+	b, _ := json.Marshal(resp)
+	uhttp.SendSuccessfulResponse(w, b)
+}
 
-	responseLoginData := &ResponseLoginData{
-		Token:  authData.AccessToken,
-		UserID: authData.UserID,
+func randomURLSafe(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	s := base64.RawURLEncoding.EncodeToString(b)
+	if len(s) > n {
+		return s[:n]
 	}
-
-	jsonResponseLoginData, err := json.Marshal(responseLoginData)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	uhttp.SendSuccessfulResponse(w, jsonResponseLoginData)
-
+	return s
 }
