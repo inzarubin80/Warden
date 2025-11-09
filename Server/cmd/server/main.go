@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-
 	"github.com/inzarubin80/Server/internal/app"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
@@ -18,9 +17,12 @@ func main() {
 	}
 
 	ctx := context.Background()
+	// default HTTP port
 	options := app.Options{
-		Addr: ":8090",
+		Addr:  "0.0.0.0:8090",
 	}
+
+	
 
 	conf := app.NewConfig(options)
 
@@ -47,3 +49,4 @@ func main() {
 	}
 
 }
+

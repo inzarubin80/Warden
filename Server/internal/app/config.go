@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"os"
+
 	authinterface "github.com/inzarubin80/Server/internal/app/authinterface"
 	providerUserData "github.com/inzarubin80/Server/internal/app/clients/provider_user_data"
 	"github.com/inzarubin80/Server/internal/app/defenitions"
@@ -34,6 +35,10 @@ type (
 		path          path
 		sectrets      sectrets
 		provadersConf authinterface.MapProviderOauthConf
+		// TLS debug settings
+		tlsEnabled  bool
+		tlsCertFile string
+		tlsKeyFile  string
 	}
 )
 
@@ -43,7 +48,7 @@ func NewConfig(opts Options) config {
 		Oauth2Config: &oauth2.Config{
 			ClientID:     os.Getenv("CLIENT_ID_YANDEX"),
 			ClientSecret: os.Getenv("CLIENT_SECRET_YANDEX"),
-			RedirectURL:  os.Getenv("APP_ROOT") + "/auth/callback?provider=yandex",
+			RedirectURL: "warden://auth/callback?provider=yandex",
 			Scopes:       []string{"login:info"},
 			Endpoint:     yandex.Endpoint,
 		},
@@ -53,7 +58,7 @@ func NewConfig(opts Options) config {
 		ProviderUserData: providerUserData.NewProviderUserData("https://login.yandex.ru/info?format=json", &oauth2.Config{
 			ClientID:     os.Getenv("CLIENT_ID_YANDEX"),
 			ClientSecret: os.Getenv("CLIENT_SECRET_YANDEX"),
-			RedirectURL:  os.Getenv("APP_ROOT") + "/auth/callback?provider=yandex",
+			RedirectURL:  "warden://auth/callback?provider=yandex",
 			Scopes:       []string{"login:info"},
 			Endpoint:     yandex.Endpoint,
 		}, "yandex"),
@@ -106,7 +111,7 @@ func NewConfig(opts Options) config {
 
 			getLastSession: fmt.Sprintf("GET	/api/sessions/{%s}/{%s}", defenitions.Page, defenitions.PageSize),
 		},
-		
+
 		sectrets: sectrets{
 			storeSecret:        os.Getenv("STORE_SECRET"),
 			accessTokenSecret:  os.Getenv("ACCESS_TOKEN_SECRET"),
@@ -114,6 +119,9 @@ func NewConfig(opts Options) config {
 		},
 
 		provadersConf: provaders,
+		tlsEnabled:   true,
+		tlsCertFile:   os.Getenv("TLS_CERT_FILE"),
+		tlsKeyFile:    os.Getenv("TLS_KEY_FILE"),
 	}
 
 	return config

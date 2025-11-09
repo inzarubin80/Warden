@@ -33,5 +33,6 @@ type (
 	ProviderOauthConfFrontend struct {
 		Provider    string
 		IconSVG     string
+		Name string
 	}
 )

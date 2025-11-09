@@ -59,14 +59,15 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// redirect_uri may be passed as ?redirect or fallback to env REDIRECT_URI
+	// redirect_uri may be passed as ?redirect or fallback to env REDIRECT_URI.
+	// For mobile deep-link flows prefer a deep-link redirect (warden://...) so the provider opens the app.
 	redirectURI := r.URL.Query().Get("redirect")
 	if redirectURI == "" {
 		redirectURI = os.Getenv("REDIRECT_URI")
 	}
+	// If still empty, default to mobile deep-link for Yandex so app receives the code directly.
 	if redirectURI == "" {
-		http.Error(w, "redirect URI not set (pass ?redirect= or set REDIRECT_URI)", http.StatusBadRequest)
-		return
+		redirectURI = "warden://auth/callback?provider=yandex"
 	}
 
 	pkce := r.URL.Query().Get("pkce") == "1"

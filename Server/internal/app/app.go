@@ -14,7 +14,8 @@ import (
 
 	"github.com/gorilla/sessions"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/cors"
+
+	//"github.com/rs/cors"
 	"golang.org/x/oauth2"
 )
 
@@ -28,6 +29,7 @@ type (
 	}
 	server interface {
 		ListenAndServe() error
+		ListenAndServeTLS(certFile, keyFile string) error
 		Close() error
 	}
 
@@ -49,8 +51,9 @@ func (a *App) ListenAndServe() error {
 	a.mux.Handle(a.config.path.ping, appHttp.NewPingHandlerHandler(a.config.path.ping))
 	a.mux.Handle(a.config.path.session, appHttp.NewGetSessionHandler(a.store, a.config.path.session))
 	a.mux.Handle(a.config.path.getProviders, appHttp.NewProvadersHandler(a.provadersConf, a.config.path.getProviders))
-	a.mux.Handle(a.config.path.login, appHttp.NewLoginHandler(a.provadersConf, a.config.path.login, a.store))	
+	a.mux.Handle(a.config.path.login, appHttp.NewLoginHandler(a.provadersConf, a.config.path.login, a.store))
 	fmt.Println("start server")
+
 	return a.server.ListenAndServe()
 }
 
@@ -65,27 +68,30 @@ func NewApp(ctx context.Context, config config, dbConn *pgxpool.Pool) (*App, err
 	// Do not instantiate full pokerService in skeleton; leave nil to avoid linking missing implementations.
 	var pokerService *service.PokerService = nil
 
-	// Создаем CORS middleware
-	corsMiddleware := cors.New(cors.Options{
-		// Явно разрешаем оба домена (без точки в начале)
-		AllowedOrigins: []string{
-			"http://localhost:3000",
-		},
-		// Добавляем все необходимые методы
-		AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		// Разрешаем все стандартные заголовки + кастомные
-		AllowedHeaders: []string{
-			"Origin", "Content-Type", "Accept", "Authorization",
-			"X-Requested-With", "X-CSRF-Token", "Custom-Header",
-		},
-		// Разрешаем куки и авторизацию
-		AllowCredentials: true,
-		// Опционально: максимальное время кеширования preflight-запросов
-		MaxAge: 86400,
-	})
+	/*
+		// Создаем CORS middleware
+		corsMiddleware := cors.New(cors.Options{
+			// Явно разрешаем оба домена (без точки в начале)
+			AllowedOrigins: []string{
+				"http://localhost:3000",
+				"http://10.0.2.2",
+			},
+			// Добавляем все необходимые методы
+			AllowedMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
+			// Разрешаем все стандартные заголовки + кастомные
+			AllowedHeaders: []string{
+				"Origin", "Content-Type", "Accept", "Authorization",
+				"X-Requested-With", "X-CSRF-Token", "Custom-Header",
+			},
+			// Разрешаем куки и авторизацию
+			AllowCredentials: true,
+			// Опционально: максимальное время кеширования preflight-запросов
+			MaxAge: 86400,
+		})
+	*/
 
 	// Обертываем основной обработчик
-	handler := corsMiddleware.Handler(middleware.NewLogMux(mux))
+	handler := middleware.NewLogMux(mux)
 
 	return &App{
 		mux:           mux,

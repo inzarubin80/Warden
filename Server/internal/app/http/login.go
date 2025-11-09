@@ -4,14 +4,17 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"sync"
 	"time"
+
+	"net/url"
 
 	"github.com/gorilla/sessions"
 	authinterface "github.com/inzarubin80/Server/internal/app/authinterface"
 	"github.com/inzarubin80/Server/internal/app/uhttp"
-	"golang.org/x/oauth2"
 )
 
 type LoginHandler struct {
@@ -65,25 +68,50 @@ func (h *LoginHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	challenge = req.CodeChallenge
 
-	// save state server-side (one-time, short TTL) so we can validate it at exchange
+	// save state server-side (one-time, TTL 15 minutes) so we can validate it at exchange
 	h.loginStateStoreMu.Lock()
-	h.loginStateStore[state] = time.Now().Add(5 * time.Minute)
+	h.loginStateStore[state] = time.Now().Add(15 * time.Minute)
 	h.loginStateStoreMu.Unlock()
 
-	localCfg := *cfg.Oauth2Config
-	localCfg.RedirectURL = cfg.Oauth2Config.RedirectURL
-	opts := []oauth2.AuthCodeOption{}
-	if challenge != "" {
-		opts = append(opts, oauth2.SetAuthURLParam("code_challenge", challenge))
-		opts = append(opts, oauth2.SetAuthURLParam("code_challenge_method", "S256"))
+	// Build auth_url explicitly to ensure redirect_uri matches mobile registration.
+	redirectURI := os.Getenv("OAUTH_REDIRECT_URI_MOBILE")
+	if redirectURI == "" {
+		if cfg.Oauth2Config != nil && cfg.Oauth2Config.RedirectURL != "" {
+			redirectURI = cfg.Oauth2Config.RedirectURL
+		} else {
+			redirectURI = fmt.Sprintf("warden://auth/callback?provider=%s", req.Provider)
+		}
 	}
-	authURL := localCfg.AuthCodeURL(state, opts...)
+
+	scope := "login:info"
+	if cfg.Oauth2Config != nil && len(cfg.Oauth2Config.Scopes) > 0 {
+		scope = cfg.Oauth2Config.Scopes[0]
+	}
+
+	// build Yandex authorize URL
+	base := "https://oauth.yandex.com/authorize"
+	q := make(url.Values)
+	q.Set("client_id", cfg.Oauth2Config.ClientID)
+	q.Set("response_type", "code")
+	q.Set("redirect_uri", redirectURI)
+	q.Set("scope", scope)
+	q.Set("state", state)
+	if challenge != "" {
+		q.Set("code_challenge", challenge)
+		q.Set("code_challenge_method", "S256")
+	}
+
+	authURL := base + "?" + q.Encode()
 
 	resp := map[string]string{
 		"auth_url": authURL,
 		"state":    state,
 	}
-	b, _ := json.Marshal(resp)
+	b, err := json.Marshal(resp)
+	if err != nil {
+		uhttp.SendErrorResponse(w, http.StatusInternalServerError, "internal error")
+		return
+	}
 	uhttp.SendSuccessfulResponse(w, b)
 }
 
