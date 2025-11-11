@@ -17,11 +17,11 @@ type (
 		Addr string
 	}
 	path struct {
-		index, getPoker, createPoker, createTask,
+			index, getPoker, createPoker, createTask,
 		getTasks, getTask, updateTask, deleteTask,
-		getComents, addComent, setVotingTask,
-		getVotingControlState, ws, login, session, refreshToken, logOut, getProviders,
-		ping, vote, getUserEstimates, setVotingControlState, setUserName, getUser, setUserSettings, getLastSession, deletePoker string
+			getComents, addComent, setVotingTask,
+			getVotingControlState, ws, login, exchange, session, refreshToken, logOut, getProviders,
+			ping, vote, getUserEstimates, setVotingControlState, setUserName, getUser, setUserSettings, getLastSession, deletePoker string
 	}
 
 	sectrets struct {
@@ -100,6 +100,7 @@ func NewConfig(opts Options) config {
 			getProviders: "GET /api/providers",
 
 			login:           "POST	/api/user/login",
+			exchange:        "POST	/api/user/exchange",
 			setUserName:     "POST	/api/user/name",
 			setUserSettings: "POST	/api/user/settings",
 
